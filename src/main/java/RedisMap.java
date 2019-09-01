@@ -11,7 +11,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("WeakerAccess")
-public class RedisMap<K, V> implements Map<String, Integer> {
+public class RedisMap<K, V> implements Map<K, V> {
   Jedis jedis;
   String pattern;
 
@@ -41,7 +41,7 @@ public class RedisMap<K, V> implements Map<String, Integer> {
     //TODO: Придумать более быстрый вариант
     Set<String> keys = jedis.keys(pattern + "*");
     for (String key : keys) {
-      Integer integer = get(key);
+      V integer = get(loadKey(key));
       if (value == null && null == integer) return true;
       if (value != null && value.equals(integer)) return true;
     }
@@ -49,39 +49,34 @@ public class RedisMap<K, V> implements Map<String, Integer> {
   }
 
   @Override
-  public Integer get(Object key) {
+  public V get(Object key) {
     String s = jedis.get(getKey(key));
-    Integer x = null;
-    if (s != null && !"null".equals(s)) {
-      x = Integer.valueOf(s);
-    }
-    return x;
+    return loadValue(s);
   }
 
   @Override
-  public Integer put(String key, Integer value) {
-    Integer oldValue = null;
+  public V put(K key, V value) {
     String s = jedis.get(getKey(key));
-    if (s != null && !"null".equals(s)) oldValue = Integer.valueOf(s);
+    V oldValue  = loadValue(s);
     jedis.set(getKey(key), toStringValue(value));
     return oldValue;
   }
 
-  private String toStringValue(Integer value) {
+  private String toStringValue(V value) {
     if (value == null) return "null";
     return value.toString();
   }
 
   @Override
-  public Integer remove(Object key) {
-    Integer val = get(key);
+  public V remove(Object key) {
+    V val = get(key);
     jedis.del(getKey(key));
     return val;
   }
 
   @Override
-  public void putAll(Map<? extends String, ? extends Integer> m) {
-    for (Entry<? extends String, ? extends Integer> e : m.entrySet()) {
+  public void putAll(Map<? extends K, ? extends V> m) {
+    for (Entry<? extends K, ? extends V> e : m.entrySet()) {
       put(e.getKey(), e.getValue());
     }
   }
@@ -93,46 +88,39 @@ public class RedisMap<K, V> implements Map<String, Integer> {
   }
 
   @Override
-  public Set<String> keySet() {
-    Set<String> keys = jedis.keys(pattern + "*").stream().map(s -> s.replaceAll(pattern, "")).collect(Collectors.toSet());
-    for (String key : keys) {
-      if ("null".equals(key)) {
-        keys.remove("null");
-        keys.add(null);
-      }
-    }
-    return keys;
+  public Set<K> keySet() {
+    return jedis.keys(pattern + "*").stream().map(this::loadKey).collect(Collectors.toSet());
   }
 
   @Override
-  public Collection<Integer> values() {
-    Map<String, Integer> data = new HashMap<>();
+  public Collection<V> values() {
+    Map<String, V> data = new HashMap<>();
     for (String key : jedis.keys(pattern + "*")) {
-      data.put(key, get(key.replace(pattern, "")));
+      data.put(key, get(loadKey(key)));
     }
     return data.values();
   }
 
   @Override
-  public Set<Entry<String, Integer>> entrySet() {
+  public Set<Entry<K, V>> entrySet() {
     //TODO: Придумать вариант умнее
-    Map<String, Integer> data = new HashMap<>();
+    Map<K, V> data = new HashMap<>();
     for (String key : jedis.keys(pattern + "*")) {
-      data.put(key, get(key));
+      data.put(loadKey(key), get(key));
     }
     return data.entrySet();
   }
 
   @Override
-  public Integer getOrDefault(Object key, Integer defaultValue) {
-    Integer integer = get(key);
-    if (integer == null) integer = defaultValue;
-    return integer;
+  public V getOrDefault(Object key, V defaultValue) {
+    V saved = get(key);
+    if (saved == null) saved = defaultValue;
+    return saved;
   }
 
   @Override
   public boolean remove(Object key, Object value) {
-    Integer integer = get(key);
+    V integer = get(key);
     if (value.equals(integer)) {
       remove(key);
       return true;
@@ -141,15 +129,15 @@ public class RedisMap<K, V> implements Map<String, Integer> {
   }
 
   @Override
-  public void forEach(BiConsumer<? super String, ? super Integer> action) {
-    for (Entry<String, Integer> entry : entrySet()) {
+  public void forEach(BiConsumer<? super K, ? super V> action) {
+    for (Entry<K, V> entry : entrySet()) {
       action.accept(entry.getKey(), entry.getValue());
     }
   }
 
   @Override
-  public Integer replace(String key, Integer value) {
-    Integer integer = get(key);
+  public V replace(K key, V value) {
+    V integer = get(key);
     if (integer != null) {
       put(key, value);
       return integer;
@@ -158,8 +146,8 @@ public class RedisMap<K, V> implements Map<String, Integer> {
   }
 
   @Override
-  public boolean replace(String key, Integer oldValue, Integer newValue) {
-    Integer integer = get(key);
+  public boolean replace(K key, V oldValue, V newValue) {
+    V integer = get(key);
     if (oldValue.equals(integer)) {
       put(key, newValue);
       return true;
@@ -172,5 +160,33 @@ public class RedisMap<K, V> implements Map<String, Integer> {
       key = "null";
     }
     return pattern + key.toString().replaceAll(pattern, "");
+  }
+
+  /**
+   * Десериализация ключа
+   *
+   * @param key сериализованный ключ из Redis
+   * @return Десериализованный ключ
+   */
+  private K loadKey(String key) {
+    if (key == null) return null;
+    key = key.replace(pattern, "");
+    if ("null".equals(key)) return null;
+    //TODO: murtuzaaliev 01.09.2019 Загружать ключи из строки редиски
+    return (K) "TODO";
+  }
+
+  /**
+   * Десериализация значения
+   *
+   * @param serializedValue сериализованное значение из Redis
+   * @return Десериализованное значение
+   */
+  private V loadValue(String serializedValue) {
+    if (serializedValue == null) return null;
+    serializedValue = serializedValue.replace(pattern, "");
+    if ("null".equals(serializedValue)) return null;
+    //TODO: murtuzaaliev 01.09.2019 Загружать ключи из строки редиски
+    return null;
   }
 }
