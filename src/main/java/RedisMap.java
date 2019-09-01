@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("WeakerAccess")
 public class RedisMap<K, V> implements Map<String, Integer> {
@@ -40,7 +41,9 @@ public class RedisMap<K, V> implements Map<String, Integer> {
     //TODO: Придумать более быстрый вариант
     Set<String> keys = jedis.keys(pattern + "*");
     for (String key : keys) {
-      if (value.equals(Integer.valueOf(jedis.get(key)))) return true;
+      Integer integer = get(key);
+      if (value == null && null == integer) return true;
+      if (value != null && value.equals(integer)) return true;
     }
     return false;
   }
@@ -49,7 +52,7 @@ public class RedisMap<K, V> implements Map<String, Integer> {
   public Integer get(Object key) {
     String s = jedis.get(getKey(key));
     Integer x = null;
-    if (s != null) {
+    if (s != null && !"null".equals(s)) {
       x = Integer.valueOf(s);
     }
     return x;
@@ -57,8 +60,16 @@ public class RedisMap<K, V> implements Map<String, Integer> {
 
   @Override
   public Integer put(String key, Integer value) {
-    jedis.set(getKey(key), Integer.toString(value));
-    return value;
+    Integer oldValue = null;
+    String s = jedis.get(getKey(key));
+    if (s != null && !"null".equals(s)) oldValue = Integer.valueOf(s);
+    jedis.set(getKey(key), toStringValue(value));
+    return oldValue;
+  }
+
+  private String toStringValue(Integer value) {
+    if (value == null) return "null";
+    return value.toString();
   }
 
   @Override
@@ -77,19 +88,27 @@ public class RedisMap<K, V> implements Map<String, Integer> {
 
   @Override
   public void clear() {
-
+    String[] keys = jedis.keys(pattern + "*").toArray(new String[0]);
+    jedis.del(keys);
   }
 
   @Override
   public Set<String> keySet() {
-    return jedis.keys(pattern + "*");
+    Set<String> keys = jedis.keys(pattern + "*").stream().map(s -> s.replaceAll(pattern, "")).collect(Collectors.toSet());
+    for (String key : keys) {
+      if ("null".equals(key)) {
+        keys.remove("null");
+        keys.add(null);
+      }
+    }
+    return keys;
   }
 
   @Override
   public Collection<Integer> values() {
     Map<String, Integer> data = new HashMap<>();
     for (String key : jedis.keys(pattern + "*")) {
-      data.put(key, get(key));
+      data.put(key, get(key.replace(pattern, "")));
     }
     return data.values();
   }
@@ -149,6 +168,9 @@ public class RedisMap<K, V> implements Map<String, Integer> {
   }
 
   private String getKey(Object key) {
-    return pattern + key;
+    if (key == null) {
+      key = "null";
+    }
+    return pattern + key.toString().replaceAll(pattern, "");
   }
 }
