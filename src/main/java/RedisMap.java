@@ -57,14 +57,9 @@ public class RedisMap<K, V> implements Map<K, V> {
   @Override
   public V put(K key, V value) {
     String s = jedis.get(getKey(key));
-    V oldValue  = loadValue(s);
+    V oldValue = loadValue(s);
     jedis.set(getKey(key), toStringValue(value));
     return oldValue;
-  }
-
-  private String toStringValue(V value) {
-    if (value == null) return "null";
-    return value.toString();
   }
 
   @Override
@@ -106,7 +101,7 @@ public class RedisMap<K, V> implements Map<K, V> {
     //TODO: Придумать вариант умнее
     Map<K, V> data = new HashMap<>();
     for (String key : jedis.keys(pattern + "*")) {
-      data.put(loadKey(key), get(key));
+      data.put(loadKey(key), get(loadKey(key)));
     }
     return data.entrySet();
   }
@@ -114,16 +109,18 @@ public class RedisMap<K, V> implements Map<K, V> {
   @Override
   public V getOrDefault(Object key, V defaultValue) {
     V saved = get(key);
-    if (saved == null) saved = defaultValue;
+    if (saved == null && !containsKey(key)) saved = defaultValue;
     return saved;
   }
 
   @Override
   public boolean remove(Object key, Object value) {
-    V integer = get(key);
-    if (value.equals(integer)) {
-      remove(key);
-      return true;
+    if (containsKey(key)) {
+      V integer = get(key);
+      if ((integer == value || value.equals(integer))) {
+        remove(key);
+        return true;
+      }
     }
     return false;
   }
@@ -137,8 +134,8 @@ public class RedisMap<K, V> implements Map<K, V> {
 
   @Override
   public V replace(K key, V value) {
-    V integer = get(key);
-    if (integer != null) {
+    if (containsKey(key)) {
+      V integer = get(key);
       put(key, value);
       return integer;
     }
@@ -148,18 +145,34 @@ public class RedisMap<K, V> implements Map<K, V> {
   @Override
   public boolean replace(K key, V oldValue, V newValue) {
     V integer = get(key);
-    if (oldValue.equals(integer)) {
+    if (oldValue == integer || oldValue.equals(integer)) {
       put(key, newValue);
       return true;
     }
     return false;
   }
 
+  @Override
+  public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
+    for (Entry<K, V> e : entrySet()) {
+      K key = e.getKey();
+      V value = e.getValue();
+
+      V newValue = function.apply(key, value);
+      put(key, newValue);
+    }
+  }
+
   private String getKey(Object key) {
     if (key == null) {
       key = "null";
     }
-    return pattern + key.toString().replaceAll(pattern, "");
+    return pattern + key.toString().replaceAll(pattern, "") + "/" + key.getClass().getName();
+  }
+
+  private String toStringValue(V value) {
+    if (value == null) return "null";
+    return value.toString() + "/" + value.getClass().getName();
   }
 
   /**
@@ -169,11 +182,7 @@ public class RedisMap<K, V> implements Map<K, V> {
    * @return Десериализованный ключ
    */
   private K loadKey(String key) {
-    if (key == null) return null;
-    key = key.replace(pattern, "");
-    if ("null".equals(key)) return null;
-    //TODO: murtuzaaliev 01.09.2019 Загружать ключи из строки редиски
-    return (K) "TODO";
+    return (K) loadObject(key);
   }
 
   /**
@@ -183,10 +192,28 @@ public class RedisMap<K, V> implements Map<K, V> {
    * @return Десериализованное значение
    */
   private V loadValue(String serializedValue) {
-    if (serializedValue == null) return null;
-    serializedValue = serializedValue.replace(pattern, "");
-    if ("null".equals(serializedValue)) return null;
-    //TODO: murtuzaaliev 01.09.2019 Загружать ключи из строки редиски
-    return null;
+    return (V) loadObject(serializedValue);
+  }
+
+  private Object loadObject(String serialized) {
+    if (serialized == null) return null;
+    serialized = serialized.replace(pattern, "");
+    if ("null".equals(serialized)) return null;
+    int delimiter = serialized.lastIndexOf("/");
+    String content = serialized.substring(0, delimiter);
+    if ("null".equals(content)) return null;
+    String type = serialized.substring(delimiter + 1);
+    try {
+      Class<?> aClass = Class.forName(type);
+      if (aClass.equals(Integer.class)) return Integer.valueOf(content);
+      else if (aClass.equals(String.class)) return content;
+      else if (aClass.equals(Character.class)) return content.charAt(0);
+      else if (aClass.equals(Boolean.class)) return Boolean.valueOf(content);
+      else if (aClass.equals(IntegerEnum.class)) return IntegerEnum.valueOf(content);
+      else if (aClass.equals(Long.class)) return Long.valueOf(content);
+      else throw new RuntimeException("Unsupported type: " + type);
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
