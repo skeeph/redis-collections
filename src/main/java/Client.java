@@ -1,3 +1,5 @@
+import redis.RedisMap;
+
 import java.util.Map;
 
 public class Client {

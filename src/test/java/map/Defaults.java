@@ -1,5 +1,10 @@
+package map;
+
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import redis.IntegerEnum;
+import redis.RedisMap;
 
 import java.util.AbstractMap;
 import java.util.AbstractSet;
@@ -31,7 +36,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 //@SuppressWarnings("ALL")
-@SuppressWarnings({"unused", "WeakerAccess", "InfiniteRecursion", "ConstantConditions", "CollectionAddAllCanBeReplacedWithConstructor", "SameParameterValue", "ArraysAsListWithZeroOrOneArgument"})
+@SuppressWarnings({"unused", "WeakerAccess", "InfiniteRecursion", "ConstantConditions", "CollectionAddAllCanBeReplacedWithConstructor", "SameParameterValue", "unchecked"})
 public class Defaults {
 
   @Test(dataProvider = "Map<IntegerEnum,String> rw=all keys=withNull values=withNull")
@@ -102,7 +107,7 @@ public class Defaults {
       assertEquals(v, map.get(k));
     });
 
-    assertEquals(KEYS, EACH_KEY, description);
+    Assert.assertEquals(KEYS, EACH_KEY, description);
   }
 
   @Test(dataProvider = "Map<IntegerEnum,String> rw=true keys=all values=all")
@@ -120,7 +125,7 @@ public class Defaults {
       return replacement;
     });
 
-    assertEquals(KEYS, EACH_KEY, description);
+    Assert.assertEquals(KEYS, EACH_KEY, description);
     assertEquals(map.values().size(), EACH_REPLACE.size(), description + EACH_REPLACE);
     assertTrue(EACH_REPLACE.containsAll(map.values()), description + " : " + EACH_REPLACE + " != " + map.values());
     assertTrue(map.values().containsAll(EACH_REPLACE), description + " : " + EACH_REPLACE + " != " + map.values());
@@ -129,9 +134,7 @@ public class Defaults {
   @Test(dataProvider = "Map<IntegerEnum,String> rw=true keys=nonNull values=nonNull")
   public static void testReplaceAllNoNullReplacement(String description, Map<IntegerEnum, String> map) {
     assertThrows(
-        () -> {
-          map.replaceAll(null);
-        },
+        () -> map.replaceAll(null),
         NullPointerException.class,
         description);
     assertThrows(
@@ -375,7 +378,7 @@ public class Defaults {
     assertNull(map.remove(EXTRA_KEY), description + ": unexpected mapping");
     assertFalse(map.containsKey(EXTRA_KEY), description + ": key present");
     assertNull(map.compute(EXTRA_KEY, (k, v) -> {
-      assertEquals(k, EXTRA_KEY);
+      Assert.assertEquals(k, EXTRA_KEY);
       assertNull(v);
       return null;
     }), description);
@@ -383,7 +386,7 @@ public class Defaults {
     // ensure removal.
     assertNull(map.put(EXTRA_KEY, EXTRA_VALUE));
     assertNull(map.compute(EXTRA_KEY, (k, v) -> {
-      assertEquals(k, EXTRA_KEY);
+      Assert.assertEquals(k, EXTRA_KEY);
       assertEquals(v, EXTRA_VALUE);
       return null;
     }), description + ": null resulted expected");
@@ -391,14 +394,14 @@ public class Defaults {
     // compute with map containing null value
     assertNull(map.put(EXTRA_KEY, null), description + ": unexpected value");
     assertNull(map.compute(EXTRA_KEY, (k, v) -> {
-      assertEquals(k, EXTRA_KEY);
+      Assert.assertEquals(k, EXTRA_KEY);
       assertNull(v);
       return null;
     }), description);
     assertFalse(map.containsKey(EXTRA_KEY), description + ": null key present");
     assertNull(map.put(EXTRA_KEY, null), description + ": unexpected value");
     assertEquals(map.compute(EXTRA_KEY, (k, v) -> {
-      assertEquals(k, EXTRA_KEY);
+      Assert.assertEquals(k, EXTRA_KEY);
       assertNull(v);
       return EXTRA_VALUE;
     }), EXTRA_VALUE, description);
@@ -411,7 +414,7 @@ public class Defaults {
     Object value = map.get(KEYS[1]);
     assertTrue(null == value || value.equals(VALUES[1]), description + value);
     assertEquals(map.compute(KEYS[1], (k, v) -> {
-      assertEquals(k, KEYS[1]);
+      Assert.assertEquals(k, KEYS[1]);
       assertEquals(v, value);
       return EXTRA_VALUE;
     }), EXTRA_VALUE, description);
@@ -461,7 +464,7 @@ public class Defaults {
     }
 
     String returned = map.merge(EXTRA_KEY,
-        newValue == Merging.Value.NULL ? (String) null : VALUES[2],
+        newValue == Merging.Value.NULL ? null : VALUES[2],
         merger
     );
 
@@ -643,9 +646,7 @@ public class Defaults {
         // null key hostile
         new Object[]{"EnumMap", makeMap(() -> new EnumMap(IntegerEnum.class), false, nulls)},
         new Object[]{"TreeMap", makeMap(TreeMap::new, false, nulls)},
-        new Object[]{"ExtendsAbstractMap(TreeMap)", makeMap(() -> {
-          return new ExtendsAbstractMap(new TreeMap());
-        }, false, nulls)},
+        new Object[]{"ExtendsAbstractMap(TreeMap)", makeMap(() -> new ExtendsAbstractMap(new TreeMap()), false, nulls)},
         new Object[]{"Collections.synchronizedMap(EnumMap)", Collections.synchronizedMap(makeMap(() -> new EnumMap(IntegerEnum.class), false, nulls))}
     );
   }
@@ -658,9 +659,7 @@ public class Defaults {
         new Object[]{"ConcurrentSkipListMap", makeMap(ConcurrentSkipListMap::new, false, false)},
         new Object[]{"Collections.synchronizedMap(ConcurrentHashMap)", Collections.synchronizedMap(makeMap(ConcurrentHashMap::new, false, false))},
         new Object[]{"Collections.checkedMap(ConcurrentHashMap)", Collections.checkedMap(makeMap(ConcurrentHashMap::new, false, false), IntegerEnum.class, String.class)},
-        new Object[]{"ExtendsAbstractMap(ConcurrentHashMap)", makeMap(() -> {
-          return new ExtendsAbstractMap(new ConcurrentHashMap());
-        }, false, false)},
+        new Object[]{"ExtendsAbstractMap(ConcurrentHashMap)", makeMap(() -> new ExtendsAbstractMap(new ConcurrentHashMap()), false, false)},
         new Object[]{"ImplementsConcurrentMap", makeMap(ImplementsConcurrentMap::new, false, false)}
     );
   }

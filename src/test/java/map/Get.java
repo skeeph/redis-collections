@@ -1,3 +1,7 @@
+package map;
+
+import redis.RedisMap;
+
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.IdentityHashMap;
