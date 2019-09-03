@@ -1,8 +1,10 @@
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 
+import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -89,21 +91,21 @@ public class RedisMap<K, V> implements Map<K, V> {
 
   @Override
   public Collection<V> values() {
-    Map<String, V> data = new HashMap<>();
+    Set<V> data = new HashSet<>();
     for (String key : jedis.keys(pattern + "*")) {
-      data.put(key, get(loadKey(key)));
+      data.add(get(loadKey(key)));
     }
-    return data.values();
+    return data;
   }
 
   @Override
   public Set<Entry<K, V>> entrySet() {
     //TODO: Придумать вариант умнее
-    Map<K, V> data = new HashMap<>();
+    Set<Map.Entry<K, V>> entrySet = new HashSet<>();
     for (String key : jedis.keys(pattern + "*")) {
-      data.put(loadKey(key), get(loadKey(key)));
+      entrySet.add(new AbstractMap.SimpleEntry<>(loadKey(key), get(loadKey(key))));
     }
-    return data.entrySet();
+    return entrySet;
   }
 
   @Override
@@ -162,6 +164,7 @@ public class RedisMap<K, V> implements Map<K, V> {
       put(key, newValue);
     }
   }
+
 
   private String getKey(Object key) {
     if (key == null) {
