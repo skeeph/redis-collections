@@ -1,6 +1,7 @@
 package redis;
 
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Pipeline;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,11 +18,12 @@ public class RedisList<E> implements List<E> {
   private String sizeKey;
   private Coder<Integer, E> coder;
   private List<Integer> deleted = new ArrayList<>();
+  String listName;
 
   public RedisList() {
     //TODO: Добавить настройки
     jedis = new Jedis();
-    String listName = Long.toString(System.currentTimeMillis());
+    listName = Long.toString(System.currentTimeMillis());
     sizeKey = listName + "/size";
     coder = new ToStringCoder<>(listName);
   }
@@ -45,15 +47,12 @@ public class RedisList<E> implements List<E> {
   @Override
   public boolean contains(Object o) {
     if (size() == 0) return false;
-    for (E e : this) {
-      if (Objects.equals(e, o)) return true;
-    }
-    return false;
+    return jedis.get(coder.encodeObject(o)) != null;
   }
 
   @Override
   public Iterator<E> iterator() {
-    return getAll().iterator();
+    return new RedisIterator();
   }
 
   @Override
@@ -83,6 +82,7 @@ public class RedisList<E> implements List<E> {
   public boolean add(E s) {
     int key = size() + deleted.size();
     jedis.set(coder.encodeKey(key), coder.encodeValue(s));
+    jedis.set(coder.encodeObject(s), Integer.toString(key));
     incSize();
     //TODO: murtuzaaliev 03.09.2019
     return true;
@@ -90,16 +90,11 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public boolean remove(Object o) {
-    for (int i = 0; i < size() + deleted.size(); i++) {
-      if (!deleted.contains(i)) {
-        E e = get(i);
-        if (Objects.equals(e, o)) {
-          jedis.del(coder.encodeKey(i));
-          deleted.add(i);
-          decSize();
-          return true;
-        }
-      }
+    String encodedObject = jedis.get(coder.encodeObject(o));
+    if (encodedObject != null) {
+      Integer indexToDelete = Integer.valueOf(encodedObject);
+      remove(indexToDelete.intValue());
+      return true;
     }
     return false;
   }
@@ -122,12 +117,20 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public boolean addAll(Collection<? extends E> c) {
-    boolean changed = false;
+    Pipeline p = jedis.pipelined();
+    int key = size() + deleted.size();
+    int inkSize=0;
     for (E e : c) {
-      changed = add(e) || changed;
+      p.set(coder.encodeKey(key), coder.encodeValue(e));
+      p.set(coder.encodeObject(e), Integer.toString(key));
+      inkSize++;
+      key++;
     }
-    return changed;
+    p.sync();
+    incSize(inkSize);
+    return true;
   }
+
 
   @Override
   public boolean addAll(int index, Collection<? extends E> c) {
@@ -141,21 +144,38 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public boolean removeAll(Collection<?> c) {
-    boolean changed = false;
+    List<String> toDelete = new ArrayList<>();
     for (Object e : c) {
-      changed = remove(e) || changed;
-    }
-    return changed;
-  }
-  @Override
-  public boolean removeIf(Predicate<? super E> filter) {
-    boolean changed = false;
-    for (E e : this) {
-      if (filter.test(e)) {
-        changed = remove(e) || changed;
+      String encodedObject = jedis.get(coder.encodeObject(e));
+      if (encodedObject != null) {
+        int i = Integer.parseInt(encodedObject);
+        deleted.add(i);
+        toDelete.add(coder.encodeKey(i));
       }
     }
-    return changed;
+    jedis.del(toDelete.toArray(new String[0]));
+    decSize(toDelete.size());
+    return !toDelete.isEmpty();
+  }
+
+  @Override
+  public boolean removeIf(Predicate<? super E> filter) {
+    if (filter == null) throw new NullPointerException();
+    boolean changed = false;
+    List<String> toDelete = new ArrayList<>();
+    for (E e : this) {
+      if (filter.test(e)) {
+        String encodedObject = jedis.get(coder.encodeObject(e));
+        if (encodedObject != null) {
+          int i = Integer.parseInt(encodedObject);
+          deleted.add(i);
+          toDelete.add(coder.encodeKey(i));
+        }
+      }
+    }
+    jedis.del(toDelete.toArray(new String[0]));
+    decSize(toDelete.size());
+    return !toDelete.isEmpty();
   }
 
   @Override
@@ -189,6 +209,7 @@ public class RedisList<E> implements List<E> {
     checkIndex(index);
     E prev = get(index);
     jedis.set(coder.encodeKey(index), coder.encodeValue(element));
+    jedis.set(coder.encodeObject(element), Integer.toString(index));
     return prev;
   }
 
@@ -211,9 +232,8 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public int indexOf(Object o) {
-    for (int i = 0; i < size(); i++) {
-      if (Objects.equals(o, get(i))) return i;
-    }
+    String index = jedis.get(coder.encodeObject(o));
+    if (index != null) return Integer.parseInt(index);
     return -1;
   }
 
@@ -255,104 +275,133 @@ public class RedisList<E> implements List<E> {
     jedis.set(sizeKey, Integer.toString(size() + 1));
   }
 
+  private void incSize(int inkSize) {
+    jedis.set(sizeKey, Integer.toString(size() + inkSize));
+  }
+
+
   private void decSize() {
     jedis.set(sizeKey, Integer.toString(size() - 1));
+  }
+
+  private void decSize(int x) {
+    jedis.set(sizeKey, Integer.toString(size() - x));
   }
 
   private void checkIndex(int index) {
     if (index < 0 || index - deleted.size() >= size()) throw new IndexOutOfBoundsException();
   }
 
-  private List<E> getAll(){
-    List<E> data= new ArrayList<>();
-    for (int i = 0; i < size() + deleted.size(); i++) {
-      if (!deleted.contains(i)){
-        data.add(get(i));
-      }
-    }
-    return data;
-  }
-
   private class RedisIterator implements Iterator<E> {
+    protected Iterator<E> data;
     int current = 0;
+
+    public RedisIterator() {
+      List<E> data = new ArrayList<>();
+      for (int i = 0; i < size() + deleted.size(); i++) {
+        if (!deleted.contains(i)) {
+          data.add(get(i));
+        }
+      }
+      this.data = data.iterator();
+    }
 
     @Override
     public boolean hasNext() {
-      return current < size() + deleted.size();
+      return data.hasNext();
     }
 
     @Override
     public E next() {
-      while (deleted.contains(current)) current++;
-      return get(current++);
+//      while (deleted.contains(current)) current++;
+//      return get(current++);
+      return data.next();
     }
   }
 
-  private class RedisListIterator implements ListIterator<E> {
+  private class RedisListIterator extends RedisIterator implements ListIterator<E> {
+    //TODO: Implement List Iterator
     int current;
+    ListIterator<E> listIterator;
 
     public RedisListIterator() {
-      current = 0;
+      super();
+      List<E> copy = new ArrayList<>();
+      while (data.hasNext())
+        copy.add(data.next());
+
+      listIterator = copy.listIterator();
     }
 
     public RedisListIterator(int index) {
-      current = index+deleted.size();
+      super();
+      List<E> copy = new ArrayList<>();
+      while (data.hasNext())
+        copy.add(data.next());
+
+      listIterator = copy.subList(index, copy.size()).listIterator();
     }
 
     @Override
     public boolean hasNext() {
-      while (deleted.contains(current)) current++;
-      return current < size() + deleted.size();
+//      while (deleted.contains(current)) current++;
+//      return current < size() + deleted.size();
+      return listIterator.hasNext();
     }
 
     @Override
     public E next() {
-      E x = get(current);
-      current++;
-      return x;
+//      E x = get(current);
+//      current++;
+//      return x;
+      return listIterator.next();
     }
 
     @Override
     public boolean hasPrevious() {
-      while (deleted.contains(current)) current--;
-      return current > 0;
+//      while (deleted.contains(current)) current--;
+//      return current > 0;
+      return listIterator.hasPrevious();
     }
 
     @Override
     public E previous() {
-      return get(current--);
+//      return get(current--);
+      return listIterator.previous();
     }
 
     @Override
     public int nextIndex() {
-      int nextIndex = current + 1;
-      if (nextIndex >= size()) nextIndex = size();
-      return nextIndex;
+//      int nextIndex = current + 1;
+//      if (nextIndex >= size()) nextIndex = size();
+//      return nextIndex;
+      return listIterator.nextIndex();
     }
 
     @Override
     public int previousIndex() {
-      int prevIndex = current - 1;
-      if (prevIndex < 0) prevIndex = -1;
-      return prevIndex;
+//      int prevIndex = current - 1;
+//      if (prevIndex < 0) prevIndex = -1;
+//      return prevIndex;
+      return listIterator.previousIndex();
     }
 
     @Override
     public void remove() {
       //TODO: murtuzaaliev 03.09.2019
-      throw new UnsupportedOperationException();
+      listIterator.remove();
     }
 
     @Override
     public void set(E e) {
       //TODO: murtuzaaliev 03.09.2019
-      throw new UnsupportedOperationException();
+      listIterator.set(e);
     }
 
     @Override
     public void add(E e) {
       //TODO: murtuzaaliev 03.09.2019
-      throw new UnsupportedOperationException();
+      listIterator.add(e);
     }
   }
 
@@ -362,14 +411,16 @@ public class RedisList<E> implements List<E> {
     list.add("L");
     list.add("C");
     list.add("D");
-    System.out.println(list.remove(2));
     list.add("F");
     list.add("R");
-    list.remove("F");
+
+    List<String> toDelete = Arrays.asList("L", "C", "D");
+    list.addAll(toDelete);
 
     for (String s : list) {
-      System.out.print(s+" ");
+      System.out.print(s + " ");
     }
+    System.out.println();
     System.out.println(Arrays.toString(list.toArray(new String[0])));
   }
 }

@@ -40,19 +40,16 @@ import java.util.function.Supplier;
 public class ListDefaults {
 
   private static final Supplier<?>[] LIST_CLASSES = {
-      RedisList::new,
-//      java.util.ArrayList::new,
-//      java.util.LinkedList::new,
-//      java.util.Vector::new,
-//      java.util.concurrent.CopyOnWriteArrayList::new,
-//      ExtendsAbstractList::new
+      java.util.ArrayList::new,
+      java.util.LinkedList::new,
+      java.util.Vector::new,
+      java.util.concurrent.CopyOnWriteArrayList::new,
+      ExtendsAbstractList::new
   };
 
   private static final Supplier<?>[] LIST_CME_CLASSES = {
-      RedisList::new,
-//      java.util.ArrayList::new,
-//      java.util.Vector::new,
-//      java.util.Vector::new,
+      java.util.ArrayList::new,
+      java.util.Vector::new
   };
 
   private static final Predicate<Integer> pEven = x -> 0 == x % 2;
@@ -84,25 +81,23 @@ public class ListDefaults {
     }
   }
 
-  @DataProvider(name = "listProvider", parallel = true)
+  @DataProvider(name="listProvider", parallel=true)
   public static Object[][] listCases() {
     final List<Object[]> cases = new LinkedList<>();
-//    cases.add(new Object[] { Collections.emptyList() });
-//    cases.add(new Object[] { new ArrayList<>() });
-//    cases.add(new Object[] { new LinkedList<>() });
-//    cases.add(new Object[] { new Vector<>() });
-//    cases.add(new Object[] { new Stack<>() });
-//    cases.add(new Object[] { new CopyOnWriteArrayList<>() });
-    cases.add(new Object[]{new RedisList<>()});
+    cases.add(new Object[] { Collections.emptyList() });
+    cases.add(new Object[] { new ArrayList<>() });
+    cases.add(new Object[] { new LinkedList<>() });
+    cases.add(new Object[] { new Vector<>() });
+    cases.add(new Object[] { new Stack<>() });
+    cases.add(new Object[] { new CopyOnWriteArrayList<>() });
+    cases.add(new Object[] { new RedisList<>() });
 
-//    cases.add(new Object[] { new ArrayList(){{add(42);}} });
-    cases.add(new Object[]{new RedisList() {{
-      add(42);
-    }}});
-//    cases.add(new Object[] { new LinkedList(){{add(42);}} });
-//    cases.add(new Object[] { new Vector(){{add(42);}} });
-//    cases.add(new Object[] { new Stack(){{add(42);}} });
-//    cases.add(new Object[] { new CopyOnWriteArrayList(){{add(42);}} });
+    cases.add(new Object[] { new ArrayList(){{add(42);}} });
+    cases.add(new Object[] { new LinkedList(){{add(42);}} });
+    cases.add(new Object[] { new Vector(){{add(42);}} });
+    cases.add(new Object[] { new Stack(){{add(42);}} });
+    cases.add(new Object[] { new CopyOnWriteArrayList(){{add(42);}} });
+    cases.add(new Object[] { new RedisList(){{add(42);}} });
     return cases.toArray(new Object[0][cases.size()]);
   }
 
@@ -111,18 +106,15 @@ public class ListDefaults {
     try {
       list.forEach(null);
       fail("expected NPE not thrown");
-    } catch (NullPointerException npe) {
-    }
+    } catch (NullPointerException npe) {}
     try {
       list.replaceAll(null);
       fail("expected NPE not thrown");
-    } catch (NullPointerException npe) {
-    }
+    } catch (NullPointerException npe) {}
     try {
       list.removeIf(null);
       fail("expected NPE not thrown");
-    } catch (NullPointerException npe) {
-    }
+    } catch (NullPointerException npe) {}
     try {
       list.sort(null);
     } catch (Throwable t) {
@@ -132,7 +124,7 @@ public class ListDefaults {
 
   @Test
   public void testForEach() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> original = ((List<Integer>) test.expected);
       final List<Integer> list = ((List<Integer>) test.collection);
@@ -140,8 +132,7 @@ public class ListDefaults {
       try {
         list.forEach(null);
         fail("expected NPE not thrown");
-      } catch (NullPointerException npe) {
-      }
+      } catch (NullPointerException npe) {}
       CollectionAsserts.assertContents(list, original);
 
       final List<Integer> actual = new LinkedList<>();
@@ -159,17 +150,20 @@ public class ListDefaults {
         }
       }
 
-      trimmedSubList(list, list1 -> {
-        final List<Integer> actual1 = new LinkedList<>();
-        list1.forEach(actual1::add);
-        CollectionAsserts.assertContents(actual1, list1);
+      trimmedSubList(list, new Callback() {
+        @Override
+        public void call(final List<Integer> list) {
+          final List<Integer> actual = new LinkedList<>();
+          list.forEach(actual::add);
+          CollectionAsserts.assertContents(actual, list);
+        }
       });
     }
   }
 
   @Test
   public void testRemoveIf() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> original = ((List<Integer>) test.expected);
       final List<Integer> list = ((List<Integer>) test.collection);
@@ -177,8 +171,7 @@ public class ListDefaults {
       try {
         list.removeIf(null);
         fail("expected NPE not thrown");
-      } catch (NullPointerException npe) {
-      }
+      } catch (NullPointerException npe) {}
       CollectionAsserts.assertContents(list, original);
 
       final AtomicInteger offset = new AtomicInteger(1);
@@ -261,7 +254,7 @@ public class ListDefaults {
   @Test
   public void testReplaceAll() throws Exception {
     final int scale = 3;
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> original = ((List<Integer>) test.expected);
       final List<Integer> list = ((List<Integer>) test.collection);
@@ -269,12 +262,11 @@ public class ListDefaults {
       try {
         list.replaceAll(null);
         fail("expected NPE not thrown");
-      } catch (NullPointerException npe) {
-      }
+      } catch (NullPointerException npe) {}
       CollectionAsserts.assertContents(list, original);
 
       list.replaceAll(x -> scale * x);
-      for (int i = 0; i < original.size(); i++) {
+      for (int i=0; i < original.size(); i++) {
         assertTrue(list.get(i) == (scale * original.get(i)), "mismatch at index " + i);
       }
 
@@ -307,7 +299,7 @@ public class ListDefaults {
           final List<Integer> copy = new ArrayList<>(list);
           final int offset = 5;
           list.replaceAll(x -> offset + x);
-          for (int i = 0; i < copy.size(); i++) {
+          for (int i=0; i < copy.size(); i++) {
             assertTrue(list.get(i) == (offset + copy.get(i)), "mismatch at index " + i);
           }
         }
@@ -317,7 +309,7 @@ public class ListDefaults {
 
   @Test
   public void testSort() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> original = ((List<Integer>) test.expected);
       final List<Integer> list = ((List<Integer>) test.collection);
@@ -365,15 +357,16 @@ public class ListDefaults {
         minBitCount = bitCount;
       }
 
-      @SuppressWarnings("unchecked") final Constructor<? extends List<?>> defaultConstructor = ((Class<? extends List<?>>) test.collection.getClass()).getConstructor();
+      @SuppressWarnings("unchecked")
+      final Constructor<? extends List<?>> defaultConstructor = ((Class<? extends List<?>>)test.collection.getClass()).getConstructor();
       final List<AtomicInteger> incomparables = (List<AtomicInteger>) defaultConstructor.newInstance();
 
-      for (int i = 0; i < test.expected.size(); i++) {
+      for (int i=0; i < test.expected.size(); i++) {
         incomparables.add(new AtomicInteger(i));
       }
       CollectionSupplier.shuffle(incomparables);
       incomparables.sort(ATOMIC_INTEGER_COMPARATOR);
-      for (int i = 0; i < test.expected.size(); i++) {
+      for (int i=0; i < test.expected.size(); i++) {
         assertEquals(i, incomparables.get(i).intValue());
       }
 
@@ -412,7 +405,7 @@ public class ListDefaults {
 
   @Test
   public void testForEachThrowsCME() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CME_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CME_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> list = ((List<Integer>) test.collection);
 
@@ -422,9 +415,7 @@ public class ListDefaults {
       boolean gotException = false;
       try {
         // bad predicate that modifies its list, should throw CME
-        list.forEach((x) -> {
-          list.add(x);
-        });
+        list.forEach((x) -> {list.add(x);});
       } catch (ConcurrentModificationException cme) {
         gotException = true;
       }
@@ -436,7 +427,7 @@ public class ListDefaults {
 
   @Test
   public void testRemoveIfThrowsCME() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CME_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CME_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> original = ((List<Integer>) test.expected);
       final List<Integer> list = ((List<Integer>) test.collection);
@@ -447,7 +438,7 @@ public class ListDefaults {
       boolean gotException = false;
       try {
         // bad predicate that modifies its list, should throw CME
-        list.removeIf((x) -> list.add(x));
+        list.removeIf((x) -> {return list.add(x);});
       } catch (ConcurrentModificationException cme) {
         gotException = true;
       }
@@ -459,7 +450,7 @@ public class ListDefaults {
 
   @Test
   public void testReplaceAllThrowsCME() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CME_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CME_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> list = ((List<Integer>) test.collection);
 
@@ -469,11 +460,7 @@ public class ListDefaults {
       boolean gotException = false;
       try {
         // bad predicate that modifies its list, should throw CME
-        list.replaceAll(x -> {
-          int n = 3 * x;
-          list.add(n);
-          return n;
-        });
+        list.replaceAll(x -> {int n = 3 * x; list.add(n); return n;});
       } catch (ConcurrentModificationException cme) {
         gotException = true;
       }
@@ -485,7 +472,7 @@ public class ListDefaults {
 
   @Test
   public void testSortThrowsCME() throws Exception {
-    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[]) LIST_CME_CLASSES, SIZE);
+    final CollectionSupplier<List<Integer>> supplier = new CollectionSupplier((Supplier<List<Integer>>[])LIST_CME_CLASSES, SIZE);
     for (final CollectionSupplier.TestCase<List<Integer>> test : supplier.get()) {
       final List<Integer> list = ((List<Integer>) test.collection);
 
@@ -495,10 +482,7 @@ public class ListDefaults {
       boolean gotException = false;
       try {
         // bad predicate that modifies its list, should throw CME
-        list.sort((x, y) -> {
-          list.add(x);
-          return x - y;
-        });
+        list.sort((x, y) -> {list.add(x); return x - y;});
       } catch (ConcurrentModificationException cme) {
         gotException = true;
       }
@@ -515,12 +499,12 @@ public class ListDefaults {
   public static Object[][] intListCases() {
     final Integer[] DATA = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     final List<Object[]> cases = new LinkedList<>();
-//    cases.add(new Object[]{new ArrayList<>(Arrays.asList(DATA))});
-    cases.add(new Object[]{new RedisList<>(Arrays.asList(DATA))});
-//    cases.add(new Object[]{new LinkedList<>(Arrays.asList(DATA))});
-//    cases.add(new Object[]{new Vector<>(Arrays.asList(DATA))});
-//    cases.add(new Object[]{new CopyOnWriteArrayList<>(Arrays.asList(DATA))});
-//    cases.add(new Object[]{new ExtendsAbstractList<>(Arrays.asList(DATA))});
+    cases.add(new Object[] { new ArrayList<>(Arrays.asList(DATA)) });
+    cases.add(new Object[] { new LinkedList<>(Arrays.asList(DATA)) });
+    cases.add(new Object[] { new Vector<>(Arrays.asList(DATA)) });
+    cases.add(new Object[] { new CopyOnWriteArrayList<>(Arrays.asList(DATA)) });
+    cases.add(new Object[] { new ExtendsAbstractList<>(Arrays.asList(DATA)) });
+    cases.add(new Object[] { new RedisList<>(Arrays.asList(DATA)) });
     return cases.toArray(new Object[0][cases.size()]);
   }
 

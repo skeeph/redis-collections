@@ -1,5 +1,7 @@
 package redis;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class ToStringCoder<K, V> implements Coder<K, V> {
   private final String pattern;
 
@@ -50,6 +52,7 @@ public class ToStringCoder<K, V> implements Coder<K, V> {
       else if (aClass.equals(Boolean.class)) return Boolean.valueOf(content);
       else if (aClass.equals(IntegerEnum.class)) return IntegerEnum.valueOf(content);
       else if (aClass.equals(Long.class)) return Long.valueOf(content);
+      else if (aClass.equals(AtomicInteger.class)) return new AtomicInteger(Integer.parseInt(content));
       else throw new RuntimeException("Unsupported type: " + type);
     } catch (ClassNotFoundException e) {
       throw new RuntimeException(e);

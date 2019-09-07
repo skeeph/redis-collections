@@ -21,7 +21,6 @@ import java.util.function.Supplier;
  * @library
  * @summary A Supplier of test cases for Collection tests
  */
-@SuppressWarnings({"unchecked", "JavaDoc"})
 public final class CollectionSupplier<C extends Collection<Integer>> implements Supplier<Iterable<CollectionSupplier.TestCase<C>>> {
 
   private final Supplier<C>[] classes;
@@ -30,7 +29,6 @@ public final class CollectionSupplier<C extends Collection<Integer>> implements 
   /**
    * A Collection test case.
    */
-  @SuppressWarnings("WeakerAccess")
   public static final class TestCase<C extends Collection<Integer>> {
 
     /**
@@ -154,32 +152,46 @@ public final class CollectionSupplier<C extends Collection<Integer>> implements 
         assertTrue(emptyWithSlack.remove(42));
         cases.add(new TestCase("emptyWithSlack", emptyWithSlack));
 
-        final Collection<Integer> regularWithSlack = type.get(); //TODO
+        final Collection<Integer> singleWithSlack = type.get();
+        singleWithSlack.add(42);
+        singleWithSlack.add(43);
+        assertTrue(singleWithSlack.remove(43));
+        cases.add(new TestCase("singleWithSlack", singleWithSlack));
+
+        final Collection<Integer> regularWithSlack = type.get();
         for (int i = 0; i < (2 * size); i++) {
           regularWithSlack.add(i);
         }
-        assertTrue(regularWithSlack.removeIf((x) -> x >= size));
+        assertTrue(regularWithSlack.removeIf((x) -> {
+          return x >= size;
+        }));
         cases.add(new TestCase("regularWithSlack", regularWithSlack));
 
         final Collection<Integer> reverseWithSlack = type.get();
         for (int i = 2 * size; i >= 0; i--) {
           reverseWithSlack.add(i);
         }
-        assertTrue(reverseWithSlack.removeIf((x) -> x < size));
+        assertTrue(reverseWithSlack.removeIf((x) -> {
+          return x < size;
+        }));
         cases.add(new TestCase("reverseWithSlack", reverseWithSlack));
 
         final Collection<Integer> oddsWithSlack = type.get();
         for (int i = 0; i < 2 * size; i++) {
           oddsWithSlack.add((i * 2) + 1);
         }
-        assertTrue(oddsWithSlack.removeIf((x) -> x >= size));
+        assertTrue(oddsWithSlack.removeIf((x) -> {
+          return x >= size;
+        }));
         cases.add(new TestCase("oddsWithSlack", oddsWithSlack));
 
         final Collection<Integer> evensWithSlack = type.get();
         for (int i = 0; i < 2 * size; i++) {
           evensWithSlack.add(i * 2);
         }
-        assertTrue(evensWithSlack.removeIf((x) -> x >= size));
+        assertTrue(evensWithSlack.removeIf((x) -> {
+          return x >= size;
+        }));
         cases.add(new TestCase("evensWithSlack", evensWithSlack));
 
         final Collection<Integer> fibonacciWithSlack = type.get();
@@ -194,7 +206,9 @@ public final class CollectionSupplier<C extends Collection<Integer>> implements 
           prev2 = prev1;
           prev1 = n;
         }
-        assertTrue(fibonacciWithSlack.removeIf((x) -> x < 20));
+        assertTrue(fibonacciWithSlack.removeIf((x) -> {
+          return x < 20;
+        }));
         cases.add(new TestCase("fibonacciWithSlack",
             fibonacciWithSlack));
       } catch (Exception failed) {

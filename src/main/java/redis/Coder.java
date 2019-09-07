@@ -8,4 +8,9 @@ public interface Coder<K, V> {
   String encodeKey(Object key);
 
   String encodeValue(V value);
+
+  default String encodeObject(Object value){
+    if (value == null) return "null";
+    return value.toString() + "/" + value.getClass().getName();
+  }
 }
