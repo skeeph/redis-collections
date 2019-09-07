@@ -21,6 +21,7 @@ import java.util.function.Supplier;
  * @library
  * @summary A Supplier of test cases for Collection tests
  */
+@SuppressWarnings({"unchecked", "JavaDoc"})
 public final class CollectionSupplier<C extends Collection<Integer>> implements Supplier<Iterable<CollectionSupplier.TestCase<C>>> {
 
   private final Supplier<C>[] classes;
@@ -29,6 +30,7 @@ public final class CollectionSupplier<C extends Collection<Integer>> implements 
   /**
    * A Collection test case.
    */
+  @SuppressWarnings("WeakerAccess")
   public static final class TestCase<C extends Collection<Integer>> {
 
     /**
@@ -152,13 +154,7 @@ public final class CollectionSupplier<C extends Collection<Integer>> implements 
         assertTrue(emptyWithSlack.remove(42));
         cases.add(new TestCase("emptyWithSlack", emptyWithSlack));
 
-        final Collection<Integer> singleWithSlack = type.get();
-        singleWithSlack.add(42);
-        singleWithSlack.add(43);
-        assertTrue(singleWithSlack.remove(43));
-        cases.add(new TestCase("singleWithSlack", singleWithSlack));
-
-        final Collection<Integer> regularWithSlack = type.get();
+        final Collection<Integer> regularWithSlack = type.get(); //TODO
         for (int i = 0; i < (2 * size); i++) {
           regularWithSlack.add(i);
         }
@@ -169,18 +165,14 @@ public final class CollectionSupplier<C extends Collection<Integer>> implements 
         for (int i = 2 * size; i >= 0; i--) {
           reverseWithSlack.add(i);
         }
-        assertTrue(reverseWithSlack.removeIf((x) -> {
-          return x < size;
-        }));
+        assertTrue(reverseWithSlack.removeIf((x) -> x < size));
         cases.add(new TestCase("reverseWithSlack", reverseWithSlack));
 
         final Collection<Integer> oddsWithSlack = type.get();
         for (int i = 0; i < 2 * size; i++) {
           oddsWithSlack.add((i * 2) + 1);
         }
-        assertTrue(oddsWithSlack.removeIf((x) -> {
-          return x >= size;
-        }));
+        assertTrue(oddsWithSlack.removeIf((x) -> x >= size));
         cases.add(new TestCase("oddsWithSlack", oddsWithSlack));
 
         final Collection<Integer> evensWithSlack = type.get();
