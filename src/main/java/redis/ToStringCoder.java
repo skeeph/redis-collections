@@ -36,6 +36,12 @@ public class ToStringCoder<K, V> implements Coder<K, V> {
     return value.toString() + "/" + value.getClass().getName();
   }
 
+  @Override
+  public String encodeObject(Object value) {
+    if (value == null) return "null";
+    return pattern+value.toString() + "_" + value.getClass().getName();
+  }
+
   private Object loadObject(String serialized) {
     if (serialized == null) return null;
     serialized = serialized.replace(pattern, "");

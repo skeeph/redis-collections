@@ -47,7 +47,7 @@ public class RedisList<E> implements List<E> {
   @Override
   public boolean contains(Object o) {
     if (size() == 0) return false;
-    return !jedis.lrange(coder.encodeObject(o),0,0).isEmpty();
+    return !jedis.lrange(coder.encodeObject(o), 0, 0).isEmpty();
   }
 
   @Override
@@ -111,7 +111,7 @@ public class RedisList<E> implements List<E> {
   public boolean containsAll(Collection<?> c) {
     Pipeline p = jedis.pipelined();
     for (Object o : c) {
-      p.lrange(coder.encodeObject(o),0,0);
+      p.lrange(coder.encodeObject(o), 0, 0);
     }
     return p.syncAndReturnAll().stream().map(x -> ((List) x).size()).noneMatch(x -> x == 0);
   }
@@ -120,7 +120,7 @@ public class RedisList<E> implements List<E> {
   public boolean addAll(Collection<? extends E> c) {
     Pipeline p = jedis.pipelined();
     int key = size() + deleted.size();
-    int inkSize=0;
+    int inkSize = 0;
     for (E e : c) {
       p.set(coder.encodeKey(key), coder.encodeValue(e));
       p.rpush(coder.encodeObject(e), Integer.toString(key));
@@ -208,9 +208,9 @@ public class RedisList<E> implements List<E> {
   public E set(int index, E element) {
     checkIndex(index);
     E prev = get(index);
-    jedis.lrem(coder.encodeObject(prev),1,Integer.toString(index));
+    jedis.lrem(coder.encodeObject(prev), 1, Integer.toString(index));
     jedis.set(coder.encodeKey(index), coder.encodeValue(element));
-    jedis.set(coder.encodeObject(element), Integer.toString(index));
+    jedis.rpush(coder.encodeObject(element), Integer.toString(index));
     return prev;
   }
 
@@ -234,17 +234,15 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public int indexOf(Object o) {
-    String index = jedis.get(coder.encodeObject(o));
+    String index = jedis.lrange(coder.encodeObject(o), 0, 0).get(0);
     if (index != null) return Integer.parseInt(index);
     return -1;
   }
 
-  //TODO: Продумать ситуацию когда несколько одинаковых элемента в списке
   @Override
   public int lastIndexOf(Object o) {
-    for (int i = size() - 1; i >= 0; i--) {
-      if (Objects.equals(o, get(i))) return i;
-    }
+    String index = jedis.lrange(coder.encodeObject(o), -1, 2).get(0);
+    if (index != null) return Integer.parseInt(index);
     return -1;
   }
 
@@ -296,115 +294,96 @@ public class RedisList<E> implements List<E> {
   }
 
   private class RedisIterator implements Iterator<E> {
-    protected Iterator<E> data;
     int current = 0;
-
-    public RedisIterator() {
-      List<E> data = new ArrayList<>();
-      for (int i = 0; i < size() + deleted.size(); i++) {
-        if (!deleted.contains(i)) {
-          data.add(get(i));
-        }
-      }
-      this.data = data.iterator();
-    }
 
     @Override
     public boolean hasNext() {
-      return data.hasNext();
+      return current < size() + deleted.size();
     }
 
     @Override
     public E next() {
-//      while (deleted.contains(current)) current++;
-//      return get(current++);
-      return data.next();
+      while (deleted.contains(current)) current++;
+      return get(current++);
     }
   }
 
   private class RedisListIterator extends RedisIterator implements ListIterator<E> {
+    private E lastReturned = null;
+
     //TODO: Implement List Iterator
     int current;
     ListIterator<E> listIterator;
 
     public RedisListIterator() {
-      super();
-      List<E> copy = new ArrayList<>();
-      while (data.hasNext())
-        copy.add(data.next());
-
-      listIterator = copy.listIterator();
+      current = 0;
     }
 
     public RedisListIterator(int index) {
-      super();
-      List<E> copy = new ArrayList<>();
-      while (data.hasNext())
-        copy.add(data.next());
-
-      listIterator = copy.subList(index, copy.size()).listIterator();
+      current = index + deleted.size();
     }
 
     @Override
     public boolean hasNext() {
-//      while (deleted.contains(current)) current++;
-//      return current < size() + deleted.size();
-      return listIterator.hasNext();
+      while (deleted.contains(current)) current++;
+      return current < size() + deleted.size();
     }
 
     @Override
     public E next() {
-//      E x = get(current);
-//      current++;
-//      return x;
-      return listIterator.next();
+      lastReturned = get(current);
+      current++;
+      return lastReturned;
     }
 
     @Override
     public boolean hasPrevious() {
-//      while (deleted.contains(current)) current--;
-//      return current > 0;
-      return listIterator.hasPrevious();
+      while (deleted.contains(current)) current--;
+      return current > 0;
     }
 
     @Override
     public E previous() {
-//      return get(current--);
-      return listIterator.previous();
+      lastReturned=get(--current);
+      return lastReturned;
     }
 
     @Override
     public int nextIndex() {
-//      int nextIndex = current + 1;
-//      if (nextIndex >= size()) nextIndex = size();
-//      return nextIndex;
-      return listIterator.nextIndex();
+      int nextIndex = current + 1;
+      if (nextIndex >= size()) nextIndex = size();
+      return nextIndex;
     }
 
     @Override
     public int previousIndex() {
-//      int prevIndex = current - 1;
-//      if (prevIndex < 0) prevIndex = -1;
-//      return prevIndex;
-      return listIterator.previousIndex();
+      int prevIndex = current - 1;
+      if (prevIndex < 0) prevIndex = -1;
+      return prevIndex;
     }
 
     @Override
     public void remove() {
       //TODO: murtuzaaliev 03.09.2019
-      listIterator.remove();
+      if (lastReturned == null)
+        throw new IllegalStateException();
+      RedisList.this.remove(lastReturned);
     }
 
     @Override
     public void set(E e) {
+      if (lastReturned == null)
+        throw new IllegalStateException();
       //TODO: murtuzaaliev 03.09.2019
-      listIterator.set(e);
+      RedisList.this.set(current, e);
     }
 
     @Override
     public void add(E e) {
+      if (lastReturned == null)
+        throw new IllegalStateException();
       //TODO: murtuzaaliev 03.09.2019
-      listIterator.add(e);
+      RedisList.this.add(current, e);
     }
   }
 }
