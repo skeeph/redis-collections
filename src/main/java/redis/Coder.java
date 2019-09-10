@@ -11,6 +11,6 @@ public interface Coder<K, V> {
 
   default String encodeObject(Object value){
     if (value == null) return "null";
-    return value.toString() + "/" + value.getClass().getName();
+    return value.toString() + "_" + value.getClass().getName();
   }
 }

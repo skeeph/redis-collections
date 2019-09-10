@@ -47,7 +47,7 @@ public class RedisList<E> implements List<E> {
   @Override
   public boolean contains(Object o) {
     if (size() == 0) return false;
-    return jedis.get(coder.encodeObject(o)) != null;
+    return !jedis.lrange(coder.encodeObject(o),0,0).isEmpty();
   }
 
   @Override
@@ -82,15 +82,15 @@ public class RedisList<E> implements List<E> {
   public boolean add(E s) {
     int key = size() + deleted.size();
     jedis.set(coder.encodeKey(key), coder.encodeValue(s));
-    jedis.set(coder.encodeObject(s), Integer.toString(key));
+    String reverseIndex = coder.encodeObject(s);
+    jedis.rpush(reverseIndex, Integer.toString(key));
     incSize();
-    //TODO: murtuzaaliev 03.09.2019
     return true;
   }
 
   @Override
   public boolean remove(Object o) {
-    String encodedObject = jedis.get(coder.encodeObject(o));
+    String encodedObject = jedis.lpop(coder.encodeObject(o));
     if (encodedObject != null) {
       Integer indexToDelete = Integer.valueOf(encodedObject);
       remove(indexToDelete.intValue());
@@ -109,10 +109,11 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public boolean containsAll(Collection<?> c) {
+    Pipeline p = jedis.pipelined();
     for (Object o : c) {
-      if (!contains(o)) return false;
+      p.lrange(coder.encodeObject(o),0,0);
     }
-    return true;
+    return p.syncAndReturnAll().stream().map(x -> ((List) x).size()).noneMatch(x -> x == 0);
   }
 
   @Override
@@ -122,7 +123,7 @@ public class RedisList<E> implements List<E> {
     int inkSize=0;
     for (E e : c) {
       p.set(coder.encodeKey(key), coder.encodeValue(e));
-      p.set(coder.encodeObject(e), Integer.toString(key));
+      p.rpush(coder.encodeObject(e), Integer.toString(key));
       inkSize++;
       key++;
     }
@@ -146,7 +147,7 @@ public class RedisList<E> implements List<E> {
   public boolean removeAll(Collection<?> c) {
     List<String> toDelete = new ArrayList<>();
     for (Object e : c) {
-      String encodedObject = jedis.get(coder.encodeObject(e));
+      String encodedObject = jedis.lpop(coder.encodeObject(e));
       if (encodedObject != null) {
         int i = Integer.parseInt(encodedObject);
         deleted.add(i);
@@ -161,11 +162,10 @@ public class RedisList<E> implements List<E> {
   @Override
   public boolean removeIf(Predicate<? super E> filter) {
     if (filter == null) throw new NullPointerException();
-    boolean changed = false;
     List<String> toDelete = new ArrayList<>();
     for (E e : this) {
       if (filter.test(e)) {
-        String encodedObject = jedis.get(coder.encodeObject(e));
+        String encodedObject = jedis.lpop(coder.encodeObject(e));
         if (encodedObject != null) {
           int i = Integer.parseInt(encodedObject);
           deleted.add(i);
@@ -192,7 +192,7 @@ public class RedisList<E> implements List<E> {
   @Override
   public void clear() {
     List<String> keys = new ArrayList<>();
-    for (int i = 1; i <= size(); i++) {
+    for (int i = 0; i <= size(); i++) {
       keys.add(coder.encodeKey(i));
     }
     jedis.del(keys.toArray(new String[0]));
@@ -208,6 +208,7 @@ public class RedisList<E> implements List<E> {
   public E set(int index, E element) {
     checkIndex(index);
     E prev = get(index);
+    jedis.lrem(coder.encodeObject(prev),1,Integer.toString(index));
     jedis.set(coder.encodeKey(index), coder.encodeValue(element));
     jedis.set(coder.encodeObject(element), Integer.toString(index));
     return prev;
@@ -215,6 +216,7 @@ public class RedisList<E> implements List<E> {
 
   @Override
   public void add(int index, E element) {
+    //TODO: Продумать вставку в середину
     if (index < 0 || index > size()) throw new IndexOutOfBoundsException();
     shiftRight(index);
     set(index, element);
@@ -237,6 +239,7 @@ public class RedisList<E> implements List<E> {
     return -1;
   }
 
+  //TODO: Продумать ситуацию когда несколько одинаковых элемента в списке
   @Override
   public int lastIndexOf(Object o) {
     for (int i = size() - 1; i >= 0; i--) {
@@ -403,24 +406,5 @@ public class RedisList<E> implements List<E> {
       //TODO: murtuzaaliev 03.09.2019
       listIterator.add(e);
     }
-  }
-
-  public static void main(String[] args) {
-    List<String> list = new RedisList<>();
-    list.add("A");
-    list.add("L");
-    list.add("C");
-    list.add("D");
-    list.add("F");
-    list.add("R");
-
-    List<String> toDelete = Arrays.asList("L", "C", "D");
-    list.addAll(toDelete);
-
-    for (String s : list) {
-      System.out.print(s + " ");
-    }
-    System.out.println();
-    System.out.println(Arrays.toString(list.toArray(new String[0])));
   }
 }
